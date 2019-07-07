@@ -47,8 +47,8 @@
     
 * **Software Requirements** : This project uses the following software and Python libraries:
         1. Python 3.0
-        1. Spark 2.4.0
-        1. Amazon S3
+        2. Spark 2.4.0
+        3. Amazon S3
         
     You will also need to have software installed to run and execute a Jupyter Notebook.
     If you do not have Python installed yet, it is highly recommended that you install the Anaconda distribution of Python, which already has the above packages and more included.    
