@@ -9,9 +9,8 @@
     * **Problem Statement** : 
        Sparkify Analytics team is particularly interested in understanding what songs users are listening to.
    
-* **DataLake Design**
-    **DataLake Design** : 
-    There are many ways I can design the DataLake. For this project I ahve followed deisgn apttern.
+* **DataLake Design**    
+    There are many ways I can design the DataLake. For this project I have followed below deisgn pattern.
     ![Sparkify DataLake Model](https://github.com/ddgope/Data-Lake-Using-Spark/blob/master/AWSDataLake.png)
     
 * **DataLake Flow**   
@@ -56,4 +55,4 @@
 
 * **Acknowledgement** : Must give credit to Udacity for the project. You can't use this for you Udacity capstone project. Otherwise, feel free to use the code here as you would like!
 
-* **Bonus** : While designing this project, I have followed below Data Lake deisgn best practices. 
+* **Bonus** : While designing this project, I have followed below Data Lake design best practices. 
