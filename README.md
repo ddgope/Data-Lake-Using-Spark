@@ -12,7 +12,7 @@
 * **DataLake Design**
     **DataLake Design** : 
     There are many ways I can design the DataLake. For this project I ahve followed deisgn apttern.
-    ![Sparkify DataLake Model](/images/AWSDataLake.png)
+    ![Sparkify DataLake Model](https://github.com/ddgope/Data-Lake-Using-Spark/blob/master/AWSDataLake.png)
     
 * **DataLake Flow**   
     * **Data Ingestion** : 
