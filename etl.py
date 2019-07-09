@@ -175,7 +175,7 @@ def main():
     input_data = "s3a://udacity-dend/"
     output_data = "data/output10/"
     
-    #process_song_data(spark, input_data, output_data)    
+    process_song_data(spark, input_data, output_data)    
     process_log_data(spark, input_data, output_data)
 
 
