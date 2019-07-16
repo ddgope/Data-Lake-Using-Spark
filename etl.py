@@ -9,11 +9,6 @@ from pyspark.sql.functions import year, month, hour, weekofyear, \
 from pyspark.sql.types import StructType
 from pyspark.sql.types import StructField
 from pyspark.sql.types import StringType,DoubleType,IntegerType
-from pyspark.sql import types as T
-import pyspark.sql.functions as F
-import time
-import configparser
-from datetime import datetime
 
 config = configparser.ConfigParser()
 config.read_file(open('dl.cfg'))
@@ -175,7 +170,7 @@ def main():
     input_data = "s3a://udacity-dend/"
     output_data = "data/output10/"
     
-    process_song_data(spark, input_data, output_data)    
+    #process_song_data(spark, input_data, output_data)    
     process_log_data(spark, input_data, output_data)
 
 
