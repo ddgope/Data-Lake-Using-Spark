@@ -1,17 +1,15 @@
 import configparser
-import datetime
 import os
+import time
+from datetime import datetime
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col
-from pyspark.sql.functions import year, month, dayofmonth, hour, weekofyear, date_format
-from pyspark.sql.functions import year, month, hour, weekofyear, \
-    date_format, dayofweek, monotonically_increasing_id
-from pyspark.sql.types import StructType
-from pyspark.sql.types import StructField
-from pyspark.sql.types import StringType,DoubleType,IntegerType
+from pyspark.sql.functions import year, month, hour, weekofyear,date_format, dayofweek, monotonically_increasing_id
+from pyspark.sql.types import StructType,StructField,StringType,DoubleType,IntegerType,TimestampType
+import boto3
 
 config = configparser.ConfigParser()
-config.read_file(open('dl.cfg'))
+config.read_file(open('/home/durgadas/dl.cfg'))
 
 os.environ['AWS_ACCESS_KEY_ID']=config['AWS']['AWS_ACCESS_KEY_ID']
 os.environ['AWS_SECRET_ACCESS_KEY']=config['AWS']['AWS_SECRET_ACCESS_KEY']
@@ -20,15 +18,29 @@ def create_spark_session():
     spark = SparkSession \
         .builder \
         .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0") \
-        .getOrCreate()  
-   
+        .getOrCreate()
     return spark
 
 
 def process_song_data(spark, input_data, output_data):
     # get filepath to song data file
-    print("songs")
-    song_data = input_data + "/song_data/A/A/A/*.json" 
+    print("Reading songs data files")
+    
+    #Spark is not able to read all the 14895 files and going for ever with the method: song_data = input_data + "/song_data/*/8/*/*.json", that's why written using below boto3
+    '''
+    s3 = boto3.resource('s3',
+                       region_name="us-west-2",
+                       aws_access_key_id=config['AWS']['AWS_ACCESS_KEY_ID'],
+                       aws_secret_access_key=config['AWS']['AWS_SECRET_ACCESS_KEY']
+                     )
+
+    songsDbBucket =  s3.Bucket("udacity-dend")
+    object_list = [k for k in songsDbBucket.objects.filter(Prefix="song_data/")]
+    paths = ["s3a://udacity-dend/"+ o.key for o in object_list ]
+    del paths[0]
+    print(paths[1])
+    '''
+    song_data = input_data + "/song_data/A/A/*/*.json" 
     
     # read song data file        
     schema = StructType([        
@@ -46,6 +58,12 @@ def process_song_data(spark, input_data, output_data):
 
     df = spark.read.schema(schema).json(song_data)
     #df=spark.read.json(song_data)
+    '''
+    dataframes = [spark.read.schema(schema).json(path) for path in paths]
+    df = dataframes[0]
+    for idx, frame in enumerate(dataframes):
+        df = df.unionAll(frame)
+    '''
 
     # extract columns to create songs table
     songs_table = df.select('song_id','title','artist_id','year','duration')    
@@ -54,7 +72,6 @@ def process_song_data(spark, input_data, output_data):
     # write songs table to parquet files partitioned by year and artist
     songs_table.write.format("parquet").partitionBy("year","artist_id").mode("overwrite").save(output_data + "/songs.parquet")
     
-
     # extract columns to create artists table    
     artists_table = df.select('artist_id','artist_name','artist_location','artist_latitude', 'artist_longitude')    
     artists_table.select('artist_id','artist_name','artist_location','artist_latitude', 'artist_longitude').dropDuplicates().collect()
@@ -68,10 +85,9 @@ def process_song_data(spark, input_data, output_data):
 
 def process_log_data(spark, input_data, output_data):
     # get filepath to log data file
-    print("logs")
+    print("Reading logs Data Files")
     log_data = input_data + 'log_data/*/*/*.json'
-    #
-    '''
+    #    
     # read log data file
     schema = StructType([
         StructField('artist', StringType()),
@@ -93,13 +109,10 @@ def process_log_data(spark, input_data, output_data):
         StructField('userAgent', StringType()),        
         StructField('userId', IntegerType())
     ])
-    df = spark.read.schema(schema).json(log_data)
-    '''
-    df = spark.read.json(log_data)
-    
-    # filter by actions for song plays -> THis I am not able to understand. Filter I can do but in which filed or column I need to do.    
-    #df = 
-    
+    # when applying schema to log_data files, it is not working thatswhy kept without schema
+    #df = spark.read.schema(schema).json(log_data)    
+    df = spark.read.json(log_data)         
+       
     # extract columns for users table    
     users_table = df.select('userId','firstName','lastName','gender','level')   
     users_table.select('userId','firstName','lastName','gender','level').dropDuplicates().collect()
@@ -109,8 +122,7 @@ def process_log_data(spark, input_data, output_data):
                                 .withColumnRenamed('lastName','last_name')      
     
     # write users table to parquet files
-    users_table.write.parquet(output_data + "/users.parquet",mode='overwrite',compression='snappy')
-     
+    users_table.write.parquet(output_data + "/users.parquet",mode='overwrite',compression='snappy')     
 
     # create datetime column from original timestamp column
     get_datetime = udf(lambda x: datetime.fromtimestamp(x/1000).datetime)
@@ -144,35 +156,41 @@ def process_log_data(spark, input_data, output_data):
 
     print('--- Saving time_table')
     # write time table to parquet files partitioned by year and month
-    time_table.write.mode('append').partitionBy('year', 'month').parquet(output_data + "time_data")
-    
+    time_table.write.mode('append').partitionBy('year', 'month').parquet(output_data + "time_data")    
     
     # read in song data to use for songplays table
-    song_data = os.path.join(input_data, 'song_data/A/A/A/*.json')
+    song_data = os.path.join(input_data, 'song_data/A/A/*/*.json')
     song_df = spark.read.json(song_data)
-    join = df.join(song_df, (df.artist == song_df.artist_name) & (df.song == song_df.title)) \
-        .withColumn('start_time', get_datetime(df.ts))\
+    
+    print('--Preparing Songs Play Table--')
+    
+    #this UDF is used for conevrt ts into time stamp filed.    
+    get_timestamp = udf(lambda x: datetime.fromtimestamp(x/1000), TimestampType())
+    
+    getsongplays_table = df.join(song_df, (df.artist == song_df.artist_name) & (df.song == song_df.title),'inner') \
+        .withColumn('start_time', get_timestamp(df.ts))\
         .withColumn("songplay_id", monotonically_increasing_id())
 
     # extract columns from joined song and log datasets to create songplays table
-    songplays_table = join.selectExpr(
+    songplays_table = getsongplays_table.selectExpr(
         ['songplay_id', 'start_time', 'userId as user_id', 'level', 'song_id', 'artist_id', 'sessionId as session_id',
          'location', 'userAgent as user_agent']) \
         .withColumn('year', year('start_time')) \
         .withColumn('month', month('start_time'))
-
-    # write songplays table to parquet files partitioned by year and month
-    songplays_table.write.partitionBy("year", "month").parquet(output_data + "/songplays.parquet",mode='overwrite',compression='snappy')    
     
+    #write songplays table to parquet files partitioned by year and month
+    songplays_table.write.partitionBy("year", "month").parquet(output_data + "/songplays.parquet",mode='overwrite',compression='snappy')            
     
 def main():
     spark = create_spark_session()
+    #input path which is AWS S3
     input_data = "s3a://udacity-dend/"
-    output_data = "data/output10/"
     
-    #process_song_data(spark, input_data, output_data)    
+    #output is the local notebook path
+    output_data = "data/output1/"
+    
+    process_song_data(spark, input_data, output_data)    
     process_log_data(spark, input_data, output_data)
-
 
 if __name__ == "__main__":
     main()
